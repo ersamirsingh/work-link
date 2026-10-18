@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { MapPin, RadioTower, Sparkles, UserRound, Wallet } from "lucide-react";
-import StatusBadge from "./StatusBadge.jsx";
+import StatusBadge, { STATUS_THEMES } from "./StatusBadge.jsx";
 import { formatCurrency, formatDateTime } from "../../models/format.model.js";
 import { useAppController } from "../../controllers/AppController.jsx";
 
@@ -19,6 +19,7 @@ const PROGRESS_LABELS = {
 export default function JobCard({ job, href, action, showAssignment = false }) {
   const { user } = useAppController();
   const isCustomer = user?.activeMode === "customer";
+  const statusTheme = STATUS_THEMES[job?.status] || STATUS_THEMES.broadcasting;
 
   const amount =
     job?.pricing?.standardRate ||
@@ -57,8 +58,13 @@ export default function JobCard({ job, href, action, showAssignment = false }) {
   return (
     <motion.article
       whileHover={{ y: -5 }}
-      className="glass-panel rounded-[1.75rem] p-5"
+      className="glass-panel relative overflow-hidden rounded-[1.75rem] p-5 pt-4.5"
     >
+      {/* Full-width colored status accent bar across top edge of card */}
+      <div
+        className={`absolute top-0 left-0 right-0 h-1.5 transition-all duration-300 ${statusTheme.barColor}`}
+      />
+
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
@@ -98,53 +104,68 @@ export default function JobCard({ job, href, action, showAssignment = false }) {
         </div>
 
         {showAssignment ? (
-          <div className="rounded-[1.2rem] border border-white/6 bg-white/3 px-4 py-3">
-            <div className="grid gap-3">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <UserRound className="h-4 w-4 text-warning" />
-                  <span className="text-base-content/55">Assigned to:</span>
-                  <span className="text-base-100 font-medium">
-                    {assignedWorkerName || "No worker assigned yet"}
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-base-content/55">Progress:</span>{" "}
-                  <span className="text-base-100 font-medium">
-                    {progressText}
-                  </span>
-                </div>
+          <div className="rounded-[1.2rem] border border-white/6 bg-white/3 px-4 py-3.5 space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex items-center gap-2 text-sm">
+                <UserRound className="h-4 w-4 text-warning shrink-0" />
+                <span className="text-base-content/55">Assigned to:</span>
+                <span className="text-base-100 font-medium">
+                  {assignedWorkerName || "No worker assigned yet"}
+                </span>
               </div>
-
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-base-content/50 font-medium">Latest Milestone:</span>
-                {latestMilestone ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-semibold bg-warning/10 text-warning border border-warning/25">
-                    <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
-                    <span>{latestMilestone.label}</span>
-                    {latestMilestone.time ? (
-                      <span className="text-base-content/40 font-normal">
-                        ({formatDateTime(latestMilestone.time)})
-                      </span>
-                    ) : null}
-                  </span>
-                ) : (
-                  <span className="text-base-content/40">
-                    No lifecycle milestone reached yet
-                  </span>
-                )}
+              <div className="text-sm">
+                <span className="text-base-content/55">Progress:</span>{" "}
+                <span className="text-base-100 font-medium">
+                  {progressText}
+                </span>
               </div>
-
-              {job?.finalRating ? (
-                <div className="text-sm">
-                  <span className="text-base-content/55">Rating:</span>{" "}
-                  <span className="text-base-100">{job.finalRating}/5</span>
-                  <span className="text-base-content/50">
-                    {job.finalReview ? ` · ${job.finalReview}` : " · Review saved"}
-                  </span>
-                </div>
-              ) : null}
             </div>
+
+            {/* Full-width colored horizontal status bar */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-base-content/65 font-medium flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${statusTheme.dot}`} />
+                  <span>Status: <strong className="text-base-100">{statusTheme.label}</strong></span>
+                </span>
+                <span className="text-xs font-bold text-base-content/80">{statusTheme.percent}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 shadow-sm ${statusTheme.barColor}`}
+                  style={{ width: `${statusTheme.percent}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs pt-0.5">
+              <span className="text-base-content/50 font-medium">Latest Milestone:</span>
+              {latestMilestone ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-semibold bg-white/5 text-base-content/85 border border-white/10">
+                  <span className={`h-1.5 w-1.5 rounded-full ${statusTheme.dot}`} />
+                  <span>{latestMilestone.label}</span>
+                  {latestMilestone.time ? (
+                    <span className="text-base-content/40 font-normal">
+                      ({formatDateTime(latestMilestone.time)})
+                    </span>
+                  ) : null}
+                </span>
+              ) : (
+                <span className="text-base-content/40">
+                  No lifecycle milestone reached yet
+                </span>
+              )}
+            </div>
+
+            {job?.finalRating ? (
+              <div className="text-sm">
+                <span className="text-base-content/55">Rating:</span>{" "}
+                <span className="text-base-100">{job.finalRating}/5</span>
+                <span className="text-base-content/50">
+                  {job.finalReview ? ` · ${job.finalReview}` : " · Review saved"}
+                </span>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
