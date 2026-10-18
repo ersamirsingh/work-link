@@ -58,13 +58,8 @@ export default function JobCard({ job, href, action, showAssignment = false }) {
   return (
     <motion.article
       whileHover={{ y: -5 }}
-      className="glass-panel relative overflow-hidden rounded-[1.75rem] p-5 pt-4.5"
+      className="glass-panel relative overflow-hidden rounded-[1.75rem] p-5"
     >
-      {/* Full-width colored status accent bar across top edge of card */}
-      <div
-        className={`absolute top-0 left-0 right-0 h-1.5 transition-all duration-300 ${statusTheme.barColor}`}
-      />
-
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
