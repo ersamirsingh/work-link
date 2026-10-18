@@ -8,6 +8,7 @@ import PageHeader from "../../views/components/PageHeader.jsx";
 import SectionPanel from "../../views/components/SectionPanel.jsx";
 import EmptyState from "../../views/components/EmptyState.jsx";
 import JobCard from "../../views/components/JobCard.jsx";
+import LoaderState from "../../views/components/LoaderState.jsx";
 import { useAppController } from "../../controllers/AppController.jsx";
 import { TextAreaField, InputField } from "../../views/components/FormField.jsx";
 import VoiceComposerField from "../../views/components/VoiceComposerField.jsx";
@@ -32,6 +33,7 @@ export default function WorkerFeedPage() {
   const [jobs, setJobs] = useState([]);
   const [myJobs, setMyJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncingLocation, setSyncingLocation] = useState(false);
   const [selectedRadius, setSelectedRadius] = useState(
     user?.workerProfile?.serviceRadiusKm || 5
   );
@@ -43,12 +45,15 @@ export default function WorkerFeedPage() {
     (user.location.coordinates[0] === 0 && user.location.coordinates[1] === 0);
 
   const handleLocationChange = async (coordinates) => {
+    setSyncingLocation(true);
     try {
       const updatedUser = await updateLocation({ coordinates });
       toast.success("Location synced! Fetching jobs...");
       await load(selectedRadius, updatedUser);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to sync location");
+    } finally {
+      setSyncingLocation(false);
     }
   };
 
@@ -165,10 +170,20 @@ export default function WorkerFeedPage() {
                   toast.error("Geolocation not supported by your browser");
                 }
               }}
+              disabled={syncingLocation}
               className="k-btn flex items-center gap-2"
             >
-              <MapPin className="h-4 w-4" />
-              <span>Update Location</span>
+              {syncingLocation ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  <span>Syncing location...</span>
+                </>
+              ) : (
+                <>
+                  <MapPin className="h-4 w-4" />
+                  <span>Update Location</span>
+                </>
+              )}
             </button>
             <Link className="k-btn-ghost" to="/app/worker/profile">
               Edit worker profile
@@ -177,7 +192,9 @@ export default function WorkerFeedPage() {
         }
       />
 
-      {isLocationRequired ? (
+      {loading ? (
+        <LoaderState label="Finding nearby opportunities..." />
+      ) : isLocationRequired ? (
         <SectionPanel warm className="max-w-2xl mx-auto text-center space-y-6 py-8">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-warning/15 text-warning mx-auto">
             <MapPin className="h-8 w-8" />

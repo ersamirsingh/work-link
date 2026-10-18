@@ -426,3 +426,41 @@ export const resolveQuery = async (req, res) => {
         });
     }
 };
+
+export const getPlatformConfigController = async (req, res) => {
+    try {
+        const data = await adminService.getPlatformConfig();
+        return res.status(200).json({
+            success: true,
+            data,
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to load platform configuration",
+        });
+    }
+};
+
+export const updatePlatformConfigController = async (req, res) => {
+    try {
+        if (req.user?.role !== "system_admin") {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized: Only System Admins can change platform configuration and rate card",
+            });
+        }
+        const { config, rateCard } = req.body;
+        const data = await adminService.updatePlatformConfig(req.user, { config, rateCard });
+        return res.status(200).json({
+            success: true,
+            message: "Platform configuration and standard rate card updated successfully",
+            data,
+        });
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message: err.message || "Failed to update platform configuration",
+        });
+    }
+};

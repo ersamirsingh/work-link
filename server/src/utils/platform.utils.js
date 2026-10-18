@@ -1,67 +1,89 @@
-export const PLATFORM_CONFIG = {
-    inspectionFee: 50,
-    trustSafetyFee: 15,
-    leadFee: 20,
-    workerBoostFee: 10,
-    rocketModeUserFee: 50,
-    rocketModeWorkerBonus: 30,
-    rocketModePlatformShare: 20,
-    verifiedProFee: 149,
-    verifiedProDurationDays: 30,
-    verifiedProEarlyAccessSeconds: 10,
-    workerCreditLimit: -200,
-    manualFiveStarCoinReward: 25,
-    disputeWindowHours: 2,
-    abandonedRefundHours: 24,
-    warrantyDays: 7,
-    defaultSearchRadiusKm: 5,
-    securityDeposit: 50,
+import PlatformConfig, {
+    DEFAULT_PLATFORM_CONFIG,
+    DEFAULT_STANDARD_RATE_CARD,
+} from "../models/platformConfig.model.js";
+
+export { DEFAULT_PLATFORM_CONFIG, DEFAULT_STANDARD_RATE_CARD };
+
+// Dynamic in-memory instances (mutated in-place to ensure backward compatibility for all imports)
+export const PLATFORM_CONFIG = { ...DEFAULT_PLATFORM_CONFIG };
+export const STANDARD_RATE_CARD = [...DEFAULT_STANDARD_RATE_CARD];
+
+/**
+ * Initialize dynamic configuration from MongoDB.
+ * Called on server bootstrap and whenever config changes.
+ */
+export const initPlatformConfig = async () => {
+    try {
+        let doc = await PlatformConfig.findOne({ key: "default_platform_config" });
+        if (!doc) {
+            doc = await PlatformConfig.create({
+                key: "default_platform_config",
+                config: DEFAULT_PLATFORM_CONFIG,
+                rateCard: DEFAULT_STANDARD_RATE_CARD,
+            });
+        }
+
+        if (doc.config) {
+            const rawConfig = doc.config.toObject ? doc.config.toObject() : doc.config;
+            Object.assign(PLATFORM_CONFIG, rawConfig);
+        }
+
+        if (Array.isArray(doc.rateCard) && doc.rateCard.length > 0) {
+            const rawRateCard = doc.rateCard.map((item) =>
+                item.toObject ? item.toObject() : item,
+            );
+            STANDARD_RATE_CARD.splice(0, STANDARD_RATE_CARD.length, ...rawRateCard);
+        }
+
+        return {
+            config: { ...PLATFORM_CONFIG },
+            rateCard: [...STANDARD_RATE_CARD],
+        };
+    } catch (error) {
+        console.error("Failed to load platform config from DB, using fallback defaults:", error.message);
+        return {
+            config: { ...PLATFORM_CONFIG },
+            rateCard: [...STANDARD_RATE_CARD],
+        };
+    }
 };
 
-export const STANDARD_RATE_CARD = [
-    {
-        serviceCode: "fan-installation",
-        title: "Fan Installation",
-        category: "Electrical",
-        price: 150,
-    },
-    {
-        serviceCode: "switchboard-repair",
-        title: "Switchboard Repair",
-        category: "Electrical",
-        price: 120,
-    },
-    {
-        serviceCode: "tap-replacement",
-        title: "Tap Replacement",
-        category: "Plumbing",
-        price: 180,
-    },
-    {
-        serviceCode: "pipe-leak-fix",
-        title: "Pipe Leak Fix",
-        category: "Plumbing",
-        price: 220,
-    },
-    {
-        serviceCode: "ac-service-basic",
-        title: "AC Service (Basic)",
-        category: "Appliance",
-        price: 499,
-    },
-    {
-        serviceCode: "deep-cleaning-room",
-        title: "Deep Cleaning (1 Room)",
-        category: "Cleaning",
-        price: 299,
-    },
-    {
-        serviceCode: "door-lock-repair",
-        title: "Door Lock Repair",
-        category: "Carpentry",
-        price: 199,
-    },
-];
+/**
+ * Save updated configuration and rate card to MongoDB and refresh in-memory cache.
+ */
+export const savePlatformConfigToDB = async ({ config, rateCard, updatedBy }) => {
+    let doc = await PlatformConfig.findOne({ key: "default_platform_config" });
+    if (!doc) {
+        doc = new PlatformConfig({
+            key: "default_platform_config",
+            config: { ...DEFAULT_PLATFORM_CONFIG },
+            rateCard: [...DEFAULT_STANDARD_RATE_CARD],
+        });
+    }
+
+    if (config && typeof config === "object") {
+        const mergedConfig = { ...doc.config.toObject(), ...config };
+        doc.config = mergedConfig;
+        Object.assign(PLATFORM_CONFIG, mergedConfig);
+    }
+
+    if (Array.isArray(rateCard)) {
+        doc.rateCard = rateCard;
+        STANDARD_RATE_CARD.splice(0, STANDARD_RATE_CARD.length, ...rateCard);
+    }
+
+    if (updatedBy) {
+        doc.updatedBy = updatedBy;
+    }
+
+    await doc.save();
+
+    return {
+        config: { ...PLATFORM_CONFIG },
+        rateCard: [...STANDARD_RATE_CARD],
+    };
+};
 
 const CROSS_SELL_MAP = {
     Electrical: [

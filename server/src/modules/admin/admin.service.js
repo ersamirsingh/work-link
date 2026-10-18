@@ -3,7 +3,12 @@ import Dispute from "../../models/dispute.model.js";
 import Job from "../../models/job.model.js";
 import User from "../../models/user.model.js";
 import Query from "../../models/query.model.js";
-import { normaliseCoordinates } from "../../utils/platform.utils.js";
+import {
+    normaliseCoordinates,
+    savePlatformConfigToDB,
+    PLATFORM_CONFIG,
+    STANDARD_RATE_CARD,
+} from "../../utils/platform.utils.js";
 import { processPendingJobsLifecycle } from "../../utils/job.utils.js";
 import bcrypt from "bcrypt";
 import { applyWalletCredit } from "../../utils/wallet.utils.js";
@@ -419,4 +424,26 @@ export class AdminService {
         await query.save();
         return query;
     }
+
+    async getPlatformConfig() {
+        return {
+            config: { ...PLATFORM_CONFIG },
+            rateCard: [...STANDARD_RATE_CARD],
+        };
+    }
+
+    async updatePlatformConfig(callingUser, { config, rateCard }) {
+        if (callingUser.role !== "system_admin") {
+            throw new Error("Unauthorized: Only System Admins can change platform configuration and rate card");
+        }
+
+        const result = await savePlatformConfigToDB({
+            config,
+            rateCard,
+            updatedBy: callingUser._id,
+        });
+
+        return result;
+    }
 }
+

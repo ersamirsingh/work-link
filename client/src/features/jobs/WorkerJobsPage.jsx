@@ -107,8 +107,9 @@ export default function WorkerJobsPage() {
       {/* Job list */}
       <SectionPanel>
         {loading ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
             <span className="loading loading-ring loading-lg text-warning" />
+            <p className="text-xs uppercase tracking-widest text-base-content/60">Loading your work...</p>
           </div>
         ) : filtered.length ? (
           <div className="grid gap-6 md:grid-cols-2">

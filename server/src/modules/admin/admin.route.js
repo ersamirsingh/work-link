@@ -26,6 +26,8 @@ import {
     createSystemAdmin,
     getQueries,
     resolveQuery,
+    getPlatformConfigController,
+    updatePlatformConfigController,
 } from "./admin.controller.js";
 import authenticateAdmin from "../../middleware/admin.middleware.js";
 
@@ -61,5 +63,7 @@ adminRouter.post("/maintenance/run", authenticateAdmin, runMaintenance);
 adminRouter.post("/system-admin", authenticateAdmin, createSystemAdmin);
 adminRouter.get("/queries", authenticateAdmin, getQueries);
 adminRouter.patch("/queries/:queryId/resolve", authenticateAdmin, resolveQuery); // Fixed route param from id to queryId
+adminRouter.get("/config", authenticateAdmin, getPlatformConfigController);
+adminRouter.put("/config", authenticateAdmin, updatePlatformConfigController);
 
 export default adminRouter;

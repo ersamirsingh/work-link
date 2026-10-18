@@ -7,9 +7,13 @@ import PageHeader from "../../views/components/PageHeader.jsx";
 import SectionPanel from "../../views/components/SectionPanel.jsx";
 import DetailGrid from "../../views/components/DetailGrid.jsx";
 
+import EmptyState from "../../views/components/EmptyState.jsx";
+import LoaderState from "../../views/components/LoaderState.jsx";
+
 export default function AdminUserDetailPage() {
   const { userId } = useParams();
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -18,14 +22,27 @@ export default function AdminUserDetailPage() {
         setUser(response.data.user);
       } catch (error) {
         toast.error(error.response?.data?.message || "Could not load user");
+      } finally {
+        setLoading(false);
       }
     };
 
     load();
   }, [userId]);
 
+  if (loading) {
+    return <LoaderState label="Loading user details..." />;
+  }
+
   if (!user) {
-    return null;
+    return (
+      <MotionPage className="space-y-8">
+        <PageHeader eyebrow="User detail" title="User not found" description="The requested user account was not found." />
+        <SectionPanel>
+          <EmptyState title="User not found" description="This user account could not be loaded or was removed." />
+        </SectionPanel>
+      </MotionPage>
+    );
   }
 
   return (

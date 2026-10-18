@@ -21,9 +21,11 @@ export default function SharedProfilePage() {
     workerAbout: user?.workerProfile?.about || "",
     coordinates: null,
   });
+  const [saving, setSaving] = useState(false);
 
   const saveProfile = async (event) => {
     event.preventDefault();
+    setSaving(true);
     try {
       await updateProfile({
         Name: profileForm.Name,
@@ -52,6 +54,8 @@ export default function SharedProfilePage() {
       toast.success("Profile updated successfully");
     } catch (error) {
       toast.error(error.response?.data?.message || "Profile update failed");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -155,8 +159,15 @@ export default function SharedProfilePage() {
               />
             </div>
             <div className="md:col-span-2">
-              <button className="k-btn w-full" type="submit">
-                Save profile
+              <button className="k-btn w-full flex items-center justify-center gap-2" type="submit" disabled={saving}>
+                {saving ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    <span>Saving profile changes...</span>
+                  </>
+                ) : (
+                  "Save profile"
+                )}
               </button>
             </div>
           </div>

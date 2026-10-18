@@ -88,8 +88,15 @@ export default function LoginPage() {
               </div>
             </label>
 
-            <button className="k-btn w-full" disabled={submitting} type="submit">
-              {submitting ? "Signing in..." : "Sign in"}
+            <button className="k-btn w-full flex items-center justify-center gap-2" disabled={submitting} type="submit">
+              {submitting ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                "Sign in"
+              )}
             </button>
 
             <p className="text-sm text-base-content/60">

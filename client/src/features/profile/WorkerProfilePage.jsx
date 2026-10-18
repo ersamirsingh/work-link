@@ -33,6 +33,10 @@ export default function WorkerProfilePage() {
     locationText: user?.locationText || "",
   });
 
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingAvailability, setSavingAvailability] = useState(false);
+  const [activatingPro, setActivatingPro] = useState(false);
+
   const toggleCategory = (cat) => {
     setProfileForm((prev) => {
       const exists = prev.categories.includes(cat);
@@ -55,6 +59,7 @@ export default function WorkerProfilePage() {
 
   const saveProfile = async (event) => {
     event.preventDefault();
+    setSavingProfile(true);
     try {
       await updateWorkerProfileRequest({
         headline: profileForm.headline,
@@ -68,11 +73,14 @@ export default function WorkerProfilePage() {
       toast.success("Worker profile updated successfully");
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not update worker profile");
+    } finally {
+      setSavingProfile(false);
     }
   };
 
   const saveAvailability = async (event) => {
     event.preventDefault();
+    setSavingAvailability(true);
     try {
       await updateAvailabilityRequest({
         isAvailable: availabilityForm.isAvailable,
@@ -84,16 +92,21 @@ export default function WorkerProfilePage() {
       toast.success("Availability and dispatch updated");
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not update availability");
+    } finally {
+      setSavingAvailability(false);
     }
   };
 
   const activateVerifiedPro = async () => {
+    setActivatingPro(true);
     try {
       await purchaseVerifiedProRequest();
       await refreshSession({ silent: true });
       toast.success("Verified Pro activated! Blue check badge unlocked.");
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not activate Verified Pro");
+    } finally {
+      setActivatingPro(false);
     }
   };
 
@@ -194,8 +207,15 @@ export default function WorkerProfilePage() {
               />
             </div>
             <div className="md:col-span-2">
-              <button className="k-btn w-full" type="submit">
-                Save worker profile
+              <button className="k-btn w-full flex items-center justify-center gap-2" type="submit" disabled={savingProfile}>
+                {savingProfile ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    <span>Saving worker profile...</span>
+                  </>
+                ) : (
+                  "Save worker profile"
+                )}
               </button>
             </div>
           </form>
@@ -256,8 +276,15 @@ export default function WorkerProfilePage() {
                   }))
                 }
               />
-              <button className="k-btn w-full" type="submit">
-                Save availability
+              <button className="k-btn w-full flex items-center justify-center gap-2" type="submit" disabled={savingAvailability}>
+                {savingAvailability ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    <span>Saving availability...</span>
+                  </>
+                ) : (
+                  "Save availability"
+                )}
               </button>
             </form>
           </SectionPanel>
@@ -286,8 +313,15 @@ export default function WorkerProfilePage() {
                   Pay ₹149/month to unlock a blue check, get a 10-second head start on new jobs,
                   and stand out before free workers even see the request.
                 </p>
-                <button className="k-btn w-full" onClick={activateVerifiedPro}>
-                  Activate Verified Pro (₹149/mo)
+                <button className="k-btn w-full flex items-center justify-center gap-2" onClick={activateVerifiedPro} disabled={activatingPro}>
+                  {activatingPro ? (
+                    <>
+                      <span className="loading loading-spinner loading-xs" />
+                      <span>Activating Verified Pro...</span>
+                    </>
+                  ) : (
+                    "Activate Verified Pro (₹149/mo)"
+                  )}
                 </button>
               </div>
             )}

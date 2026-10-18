@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Sparkles } from "lucide-react";
-import { createJobRequest, aiDiagnoseJobRequest } from "../../models/job.model.js";
+import { createJobRequest, aiDiagnoseJobRequest, getRateCardRequest } from "../../models/job.model.js";
 import { uploadMediaRequest } from "../../models/media.model.js";
 import MotionPage from "../../views/components/MotionPage.jsx";
 import PageHeader from "../../views/components/PageHeader.jsx";
@@ -13,7 +13,7 @@ import VoiceComposerField from "../../views/components/VoiceComposerField.jsx";
 import SingleMediaUploadField from "../../views/components/SingleMediaUploadField.jsx";
 
 const categories = ["General", "Electrical", "Plumbing", "Painting", "Cleaning", "Appliance", "Carpentry", "Other"];
-const standardServices = [
+const DEFAULT_SERVICES = [
   ["fan-installation", "Fan Installation", "Electrical"],
   ["switchboard-repair", "Switchboard Repair", "Electrical"],
   ["tap-replacement", "Tap Replacement", "Plumbing"],
@@ -39,9 +39,25 @@ export default function CreateJobPage() {
     language: "Hindi",
     coordinates: null,
   });
+  const [standardServices, setStandardServices] = useState(DEFAULT_SERVICES);
   const [submitting, setSubmitting] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [contextFile, setContextFile] = useState(null);
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await getRateCardRequest();
+        const list = response.data?.standardRateCard || response.data?.rateCard;
+        if (Array.isArray(list) && list.length > 0) {
+          setStandardServices(list.map((item) => [item.serviceCode, item.title, item.category]));
+        }
+      } catch (e) {
+        // Fallback to DEFAULT_SERVICES
+      }
+    };
+    fetchServices();
+  }, []);
 
   const handleAIDiagnose = async () => {
     if (!form.description.trim()) {
@@ -355,8 +371,15 @@ export default function CreateJobPage() {
           </div>
 
           <div className="md:col-span-2">
-            <button className="k-btn" disabled={submitting} type="submit">
-              {submitting ? "Broadcasting..." : "Create and broadcast job"}
+            <button className="k-btn flex items-center gap-2" disabled={submitting} type="submit">
+              {submitting ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  <span>Creating and broadcasting job...</span>
+                </>
+              ) : (
+                "Create and broadcast job"
+              )}
             </button>
           </div>
         </form>

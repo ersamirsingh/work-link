@@ -1,6 +1,6 @@
 import { JobService } from "./job.service.js";
 import { buildPublicUser } from "../../utils/user.utils.js";
-import { STANDARD_RATE_CARD } from "../../utils/platform.utils.js";
+import { STANDARD_RATE_CARD, PLATFORM_CONFIG } from "../../utils/platform.utils.js";
 
 const jobService = new JobService();
 
@@ -9,6 +9,11 @@ export const getRateCard = async (req, res) => {
         success: true,
         data: {
             rateCard: STANDARD_RATE_CARD,
+            standardRateCard: STANDARD_RATE_CARD,
+            inspectionFee: PLATFORM_CONFIG.inspectionFee,
+            trustSafetyFee: PLATFORM_CONFIG.trustSafetyFee,
+            rocketModeUserFee: PLATFORM_CONFIG.rocketModeUserFee,
+            platformConfig: PLATFORM_CONFIG,
         },
     });
 };

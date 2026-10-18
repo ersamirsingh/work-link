@@ -131,3 +131,14 @@ export const resolveAdminQueryRequest = async (id, payload) => {
   const { data } = await apiClient.patch(`/admin/queries/${id}/resolve`, payload);
   return data;
 };
+
+export const getPlatformConfigRequest = async () => {
+  const { data } = await apiClient.get("/admin/config");
+  return data;
+};
+
+export const updatePlatformConfigRequest = async (payload) => {
+  const { data } = await apiClient.put("/admin/config", payload);
+  return data;
+};
+

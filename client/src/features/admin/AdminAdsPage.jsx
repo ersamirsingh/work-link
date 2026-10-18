@@ -7,9 +7,14 @@ import SectionPanel from "../../views/components/SectionPanel.jsx";
 import { InputField, SelectField } from "../../views/components/FormField.jsx";
 import { formatDate } from "../../models/format.model.js";
 import BrowserLocationField from "../../views/components/BrowserLocationField.jsx";
+import LoaderState from "../../views/components/LoaderState.jsx";
+import EmptyState from "../../views/components/EmptyState.jsx";
 
 export default function AdminAdsPage() {
   const [ads, setAds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
   const [form, setForm] = useState({
     title: "",
     businessName: "",
@@ -26,6 +31,8 @@ export default function AdminAdsPage() {
       setAds(response.data.ads || []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not load ads");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -35,6 +42,7 @@ export default function AdminAdsPage() {
 
   const createAd = async (event) => {
     event.preventDefault();
+    setSubmitting(true);
     try {
       await createAdRequest({
         title: form.title,
@@ -58,8 +66,14 @@ export default function AdminAdsPage() {
       await load();
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not create ad");
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return <LoaderState label="Loading ads..." />;
+  }
 
   return (
     <MotionPage className="space-y-8">
@@ -135,8 +149,15 @@ export default function AdminAdsPage() {
                 setForm((current) => ({ ...current, coordinates }))
               }
             />
-            <button className="k-btn w-full" type="submit">
-              Create Ad Banner
+            <button className="k-btn w-full" type="submit" disabled={submitting}>
+              {submitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="loading loading-spinner loading-sm" />
+                  Creating Ad Banner...
+                </span>
+              ) : (
+                "Create Ad Banner"
+              )}
             </button>
           </form>
         </SectionPanel>
@@ -181,30 +202,44 @@ export default function AdminAdsPage() {
                 </div>
 
                 <button
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold border transition whitespace-nowrap ${
+                  disabled={togglingId === ad._id}
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold border transition whitespace-nowrap disabled:opacity-50 ${
                     ad.isActive
                       ? "border-green-500 bg-green-500/10 text-green-400 hover:bg-green-500/20"
                       : "border-white/10 bg-white/3 text-base-content/65 hover:bg-white/5"
                   }`}
                   onClick={async () => {
+                    setTogglingId(ad._id);
                     try {
                       await toggleAdRequest(ad._id);
                       toast.success("Ad status updated");
                       await load();
                     } catch (error) {
                       toast.error(error.response?.data?.message || "Toggle failed");
+                    } finally {
+                      setTogglingId(null);
                     }
                   }}
                 >
-                  {ad.isActive ? "Pause Ad" : "Activate Ad"}
+                  {togglingId === ad._id ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="loading loading-spinner loading-xs" />
+                      Updating...
+                    </span>
+                  ) : ad.isActive ? (
+                    "Pause Ad"
+                  ) : (
+                    "Activate Ad"
+                  )}
                 </button>
               </div>
             ))}
 
             {ads.length === 0 && (
-              <div className="py-12 text-center text-sm text-base-content/50 border border-white/5 rounded-2xl bg-white/2">
-                No sponsored ads registered. Use the builder on the left to add one!
-              </div>
+              <EmptyState
+                title="No sponsored ads registered"
+                description="Use the builder on the left to add targeted promotions."
+              />
             )}
           </div>
         </SectionPanel>

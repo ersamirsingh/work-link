@@ -214,8 +214,15 @@ export default function RegisterPage() {
             </div>
 
             <div className="md:col-span-2 space-y-4">
-              <button className="k-btn w-full" disabled={submitting} type="submit">
-                {submitting ? "Creating account..." : "Create account"}
+              <button className="k-btn w-full flex items-center justify-center gap-2" disabled={submitting} type="submit">
+                {submitting ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    <span>Creating account...</span>
+                  </>
+                ) : (
+                  "Create account"
+                )}
               </button>
               <p className="text-sm text-base-content/60">
                 Already have an account?{" "}

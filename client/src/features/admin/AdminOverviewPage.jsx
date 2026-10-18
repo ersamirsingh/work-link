@@ -1,12 +1,29 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Activity, Layers, ShieldAlert, Users, TrendingUp, UserPlus, HelpCircle, Eye, CheckCircle, AlertTriangle } from "lucide-react";
+import {
+  Activity,
+  Layers,
+  ShieldAlert,
+  Users,
+  TrendingUp,
+  UserPlus,
+  HelpCircle,
+  Eye,
+  CheckCircle,
+  AlertTriangle,
+  Sliders,
+  Plus,
+  Trash2,
+  Save,
+} from "lucide-react";
 import {
   getAdminOverviewRequest,
   runMaintenanceRequest,
   createSystemAdminRequest,
   getAdminQueriesRequest,
   resolveAdminQueryRequest,
+  getPlatformConfigRequest,
+  updatePlatformConfigRequest,
 } from "../../models/admin.model.js";
 import { useAppController } from "../../controllers/AppController.jsx";
 import MotionPage from "../../views/components/MotionPage.jsx";
@@ -21,6 +38,7 @@ export default function AdminOverviewPage() {
   const [overview, setOverview] = useState(null);
   const [adminForm, setAdminForm] = useState({ Name: "", emailId: "", contact: "", password: "" });
   const [submittingAdmin, setSubmittingAdmin] = useState(false);
+  const [runningMaintenance, setRunningMaintenance] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
   // Support Queries state
@@ -28,6 +46,18 @@ export default function AdminOverviewPage() {
   const [resolvingQueryId, setResolvingQueryId] = useState(null);
   const [queryNotes, setQueryNotes] = useState("");
   const [loadingQueries, setLoadingQueries] = useState(false);
+
+  // Platform Config & Rate Card state
+  const [platformConfig, setPlatformConfig] = useState(null);
+  const [rateCard, setRateCard] = useState([]);
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [newService, setNewService] = useState({
+    serviceCode: "",
+    title: "",
+    category: "Electrical",
+    price: "",
+  });
 
   const load = async () => {
     try {
@@ -50,6 +80,20 @@ export default function AdminOverviewPage() {
     }
   };
 
+  const loadConfig = async () => {
+    setLoadingConfig(true);
+    try {
+      const response = await getPlatformConfigRequest();
+      const payload = response.data || response;
+      setPlatformConfig(payload.config || {});
+      setRateCard(payload.rateCard || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Could not load platform config");
+    } finally {
+      setLoadingConfig(false);
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -57,8 +101,79 @@ export default function AdminOverviewPage() {
   useEffect(() => {
     if (activeTab === "queries") {
       loadQueries();
+    } else if (activeTab === "config") {
+      loadConfig();
     }
   }, [activeTab]);
+
+  const handleSaveConfig = async (e) => {
+    e?.preventDefault();
+    if (user?.role !== "system_admin") {
+      toast.error("Only system_admin can update platform configuration");
+      return;
+    }
+    setSavingConfig(true);
+    try {
+      await updatePlatformConfigRequest({
+        config: platformConfig,
+        rateCard,
+      });
+      toast.success("Platform configuration updated successfully!");
+      await loadConfig();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update platform configuration");
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleAddService = (e) => {
+    e.preventDefault();
+    if (!newService.serviceCode.trim() || !newService.title.trim() || !newService.price) {
+      toast.error("Please fill in code, title, and price");
+      return;
+    }
+    const cleanCode = newService.serviceCode.trim().toLowerCase().replace(/\s+/g, "-");
+    if (rateCard.some((item) => item.serviceCode === cleanCode)) {
+      toast.error("A service with this code already exists");
+      return;
+    }
+    setRateCard((current) => [
+      ...current,
+      {
+        serviceCode: cleanCode,
+        title: newService.title.trim(),
+        category: newService.category,
+        price: Number(newService.price),
+      },
+    ]);
+    setNewService({
+      serviceCode: "",
+      title: "",
+      category: "Electrical",
+      price: "",
+    });
+    toast.success("Service added. Remember to click 'Save Platform Configuration' to persist.");
+  };
+
+  const handleDeleteService = (serviceCode) => {
+    setRateCard((current) => current.filter((item) => item.serviceCode !== serviceCode));
+  };
+
+  const handleRateCardPriceChange = (serviceCode, newPrice) => {
+    setRateCard((current) =>
+      current.map((item) =>
+        item.serviceCode === serviceCode ? { ...item, price: Number(newPrice) || 0 } : item
+      )
+    );
+  };
+
+  const handleConfigChange = (field, value) => {
+    setPlatformConfig((current) => ({
+      ...current,
+      [field]: Number(value),
+    }));
+  };
 
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
@@ -112,34 +227,47 @@ export default function AdminOverviewPage() {
         actions={
           <button
             className="k-btn"
+            disabled={runningMaintenance}
             onClick={async () => {
+              setRunningMaintenance(true);
               try {
                 await runMaintenanceRequest();
                 toast.success("Lifecycle maintenance executed");
                 await load();
                 if (activeTab === "queries") await loadQueries();
+                if (activeTab === "config") await loadConfig();
               } catch (error) {
                 toast.error(error.response?.data?.message || "Maintenance failed");
+              } finally {
+                setRunningMaintenance(false);
               }
             }}
           >
-            Run maintenance
+            {runningMaintenance ? (
+              <span className="flex items-center gap-2">
+                <span className="loading loading-spinner loading-xs" />
+                Running maintenance...
+              </span>
+            ) : (
+              "Run maintenance"
+            )}
           </button>
         }
       />
 
       {/* Tabs */}
-      <div className="flex border-b border-white/10 gap-2">
+      <div className="flex border-b border-white/10 gap-2 overflow-x-auto">
         {[
           { id: "overview", label: "Overview & Revenue" },
           { id: "ambiguity", label: "Ambiguity Analyzer" },
           { id: "suspicious", label: "Suspicious Activity" },
-          { id: "queries", label: "User Support Queries" }
+          { id: "queries", label: "User Support Queries" },
+          { id: "config", label: "Platform Config & Rate Card" },
         ].map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`py-3 px-4 text-sm font-semibold border-b-2 transition ${
+            className={`py-3 px-4 text-sm font-semibold border-b-2 whitespace-nowrap transition ${
               activeTab === t.id
                 ? "border-warning text-warning"
                 : "border-transparent text-base-content/60 hover:text-base-100"
@@ -519,6 +647,438 @@ export default function AdminOverviewPage() {
             </div>
           )}
         </SectionPanel>
+      )}
+
+      {activeTab === "config" && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Header Card with Role indicator and Save Button */}
+          <SectionPanel>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sliders className="h-5 w-5 text-warning" />
+                  <h2 className="text-xl font-bold text-base-100">Platform Configuration & Standard Rate Card</h2>
+                </div>
+                <p className="text-xs text-base-content/60 mt-1 max-w-2xl">
+                  Configure real-time platform pricing, emergency rocket mode bonuses, safety fee splits, warranty policies, and the standard rate card. Changes persist to the database and take effect immediately across all client portals.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {user?.role === "system_admin" ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-500/10 text-green-400 border border-green-500/20">
+                    System Admin Privileges Active
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-warning/10 text-warning border border-warning/20">
+                    Read-Only (Requires system_admin role)
+                  </span>
+                )}
+                {user?.role === "system_admin" && (
+                  <button
+                    onClick={handleSaveConfig}
+                    disabled={savingConfig || loadingConfig}
+                    className="k-btn flex items-center gap-2"
+                  >
+                    {savingConfig ? (
+                      <>
+                        <span className="loading loading-spinner loading-xs" />
+                        <span>Saving Changes...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        <span>Save Platform Configuration</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </SectionPanel>
+
+          {loadingConfig ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
+              <span className="loading loading-ring loading-lg text-warning" />
+              <p className="text-sm uppercase tracking-widest text-base-content/60">Loading Platform Configuration...</p>
+            </div>
+          ) : platformConfig ? (
+            <>
+              {/* Configuration Parameters Grid */}
+              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                {/* 1. Core Fees */}
+                <SectionPanel warm>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-warning mb-4">Core Marketplace Fees</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Inspection Fee (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.inspectionFee ?? 50}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("inspectionFee", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Base diagnostic & travel charge</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Trust & Safety Fee (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.trustSafetyFee ?? 15}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("trustSafetyFee", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Marketplace guarantee & escrow fee</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Lead Fee (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.leadFee ?? 20}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("leadFee", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Direct booking unlock fee</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Worker Boost Fee (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.workerBoostFee ?? 10}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("workerBoostFee", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Worker radar priority boost</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Security Deposit (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.securityDeposit ?? 50}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("securityDeposit", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Dispute escrow stake amount</span>
+                    </div>
+                  </div>
+                </SectionPanel>
+
+                {/* 2. Rocket Mode */}
+                <SectionPanel warm>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-warning mb-4">Rocket Mode (Urgent Dispatch)</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Rocket Employer Fee (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.rocketModeUserFee ?? 50}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("rocketModeUserFee", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Extra premium charged for urgent dispatch</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Rocket Worker Bonus (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.rocketModeWorkerBonus ?? 30}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("rocketModeWorkerBonus", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Payout incentive sent directly to worker</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Rocket Platform Share (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.rocketModePlatformShare ?? 20}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("rocketModePlatformShare", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Platform retention from urgent dispatch</span>
+                    </div>
+                  </div>
+                </SectionPanel>
+
+                {/* 3. Verified Pro Program */}
+                <SectionPanel warm>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-warning mb-4">Verified Pro Program</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Verified Pro Fee (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.verifiedProFee ?? 149}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("verifiedProFee", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Monthly badge subscription fee</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Pro Validity (Days)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.verifiedProDurationDays ?? 30}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("verifiedProDurationDays", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Days badge remains active per recharge</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Early Access Advantage (Seconds)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.verifiedProEarlyAccessSeconds ?? 10}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("verifiedProEarlyAccessSeconds", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Lead time before standard workers see jobs</span>
+                    </div>
+                  </div>
+                </SectionPanel>
+
+                {/* 4. Marketplace Policies */}
+                <SectionPanel warm>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-warning mb-4">Marketplace Policies</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Worker Credit Limit (₹)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.workerCreditLimit ?? -200}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("workerCreditLimit", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Maximum allowed negative wallet balance</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">5-Star Review Coins Reward</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.manualFiveStarCoinReward ?? 25}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("manualFiveStarCoinReward", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Reward coins credited for top rating</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Dispute Window (Hours)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.disputeWindowHours ?? 2}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("disputeWindowHours", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Time window to dispute completed work</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Auto-Refund Window (Hours)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.abandonedRefundHours ?? 24}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("abandonedRefundHours", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Refund unclaimed jobs after hours</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Default Warranty (Days)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.warrantyDays ?? 7}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("warrantyDays", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Standard warranty protection duration</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-base-content/70 font-medium block mb-1">Worker Search Radius (Km)</label>
+                      <input
+                        type="number"
+                        className="k-input w-full"
+                        value={platformConfig.defaultSearchRadiusKm ?? 5}
+                        disabled={user?.role !== "system_admin"}
+                        onChange={(e) => handleConfigChange("defaultSearchRadiusKm", e.target.value)}
+                      />
+                      <span className="text-[11px] text-base-content/40">Default geo-fence broadcast distance</span>
+                    </div>
+                  </div>
+                </SectionPanel>
+              </div>
+
+              {/* Standard Rate Card Section */}
+              <SectionPanel>
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-base-100">Standard Rate Card ({rateCard.length} Services)</h3>
+                    <p className="text-xs text-base-content/60">
+                      Standardized transparent service quotes used by customers, workers, and AI estimation engine.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="table-shell mb-6">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Service Title</th>
+                        <th>Service Code</th>
+                        <th>Category</th>
+                        <th>Standard Price (₹)</th>
+                        {user?.role === "system_admin" && <th />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rateCard.map((item) => (
+                        <tr key={item.serviceCode}>
+                          <td className="font-semibold text-base-100">{item.title}</td>
+                          <td>
+                            <code className="text-xs bg-white/5 px-2 py-0.5 rounded text-warning/90 font-mono">
+                              {item.serviceCode}
+                            </code>
+                          </td>
+                          <td>
+                            <span className="text-[10px] uppercase tracking-wider font-semibold bg-white/5 text-base-content/70 px-2 py-1 rounded-full border border-white/10">
+                              {item.category}
+                            </span>
+                          </td>
+                          <td>
+                            {user?.role === "system_admin" ? (
+                              <div className="flex items-center gap-1 max-w-[140px]">
+                                <span className="text-xs text-base-content/50">₹</span>
+                                <input
+                                  type="number"
+                                  className="k-input py-1 text-sm"
+                                  value={item.price}
+                                  onChange={(e) => handleRateCardPriceChange(item.serviceCode, e.target.value)}
+                                />
+                              </div>
+                            ) : (
+                              <span className="font-bold text-warning">{formatCurrency(item.price)}</span>
+                            )}
+                          </td>
+                          {user?.role === "system_admin" && (
+                            <td className="text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteService(item.serviceCode)}
+                                className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition"
+                                title="Remove Service"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Add New Service Form (System Admin only) */}
+                {user?.role === "system_admin" && (
+                  <form onSubmit={handleAddService} className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                    <h4 className="text-sm font-bold text-base-100 mb-4 flex items-center gap-2">
+                      <Plus className="h-4 w-4 text-warning" />
+                      Add New Service to Rate Card
+                    </h4>
+                    <div className="grid gap-4 md:grid-cols-4 items-end">
+                      <InputField
+                        label="Service Title"
+                        placeholder="e.g. Inverter Installation"
+                        value={newService.title}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewService((prev) => ({
+                            ...prev,
+                            title: val,
+                            serviceCode: prev.serviceCode || val.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+                          }));
+                        }}
+                        required
+                      />
+                      <InputField
+                        label="Service Code"
+                        placeholder="e.g. inverter-installation"
+                        value={newService.serviceCode}
+                        onChange={(e) => setNewService((prev) => ({ ...prev, serviceCode: e.target.value }))}
+                        required
+                      />
+                      <div>
+                        <label className="text-xs uppercase tracking-[0.16em] text-base-content/45 block mb-2 font-medium">Category</label>
+                        <select
+                          className="k-select w-full"
+                          value={newService.category}
+                          onChange={(e) => setNewService((prev) => ({ ...prev, category: e.target.value }))}
+                        >
+                          {["Electrical", "Plumbing", "Appliance", "Cleaning", "Carpentry", "Painting", "Other"].map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <InputField
+                        label="Standard Price (₹)"
+                        placeholder="e.g. 350"
+                        type="number"
+                        value={newService.price}
+                        onChange={(e) => setNewService((prev) => ({ ...prev, price: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="mt-4 flex justify-end">
+                      <button type="submit" className="k-btn text-xs px-4 py-2 flex items-center gap-1.5">
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Add Service to Table</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Bottom Save Action */}
+                {user?.role === "system_admin" && (
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSaveConfig}
+                      disabled={savingConfig || loadingConfig}
+                      className="k-btn px-6 py-2.5 flex items-center gap-2"
+                    >
+                      {savingConfig ? (
+                        <>
+                          <span className="loading loading-spinner loading-sm" />
+                          <span>Saving Changes...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          <span>Save Platform Configuration & Rate Card</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </SectionPanel>
+            </>
+          ) : null}
+        </div>
       )}
     </MotionPage>
   );

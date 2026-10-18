@@ -40,6 +40,7 @@ import EmptyState from "../../views/components/EmptyState.jsx";
 import VoiceComposerField from "../../views/components/VoiceComposerField.jsx";
 import JobMediaGallery from "../../views/components/JobMediaGallery.jsx";
 import SingleMediaUploadField from "../../views/components/SingleMediaUploadField.jsx";
+import LoaderState from "../../views/components/LoaderState.jsx";
 
 const STATUS_COPY = {
   broadcasting: "Workers can still send interest and quotes for this booking.",
@@ -137,6 +138,8 @@ export default function JobDetailPage() {
     voiceTranscript: "",
   });
   const [submittingInterest, setSubmittingInterest] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [uploadingBeforeProof, setUploadingBeforeProof] = useState(false);
   const [aiMatches, setAiMatches] = useState({});
   const [loadingAiMatches, setLoadingAiMatches] = useState(false);
 
@@ -170,7 +173,7 @@ export default function JobDetailPage() {
     }
   };
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "system_admin";
   const isCustomer =
     String(job?.customer?._id || job?.customer || "") === String(user?._id);
   const isWorker =
@@ -225,13 +228,21 @@ export default function JobDetailPage() {
     load();
   }, [jobId, user?._id]);
 
-  const withRefresh = async (action, successMessage) => {
+  const withRefresh = async (keyOrAction, actionOrMsg, successMessage) => {
+    const isNamed = typeof keyOrAction === "string";
+    const key = isNamed ? keyOrAction : "action";
+    const action = isNamed ? actionOrMsg : keyOrAction;
+    const msg = isNamed ? successMessage : actionOrMsg;
+
+    setActionLoading(key);
     try {
       await action();
-      if (successMessage) toast.success(successMessage);
+      if (msg) toast.success(msg);
       await load();
     } catch (error) {
       toast.error(error.response?.data?.message || "Action failed");
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -274,6 +285,7 @@ export default function JobDetailPage() {
       return;
     }
 
+    setUploadingBeforeProof(true);
     try {
       await uploadMediaRequest(jobId, {
         file: beforeProofFile,
@@ -284,17 +296,15 @@ export default function JobDetailPage() {
       await load();
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not upload before-work proof");
+    } finally {
+      setUploadingBeforeProof(false);
     }
   };
 
   // ---------- render ----------
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <span className="loading loading-ring loading-lg text-warning" />
-      </div>
-    );
+    return <LoaderState label="Loading job details..." />;
   }
 
   if (!job) {
@@ -571,8 +581,15 @@ export default function JobDetailPage() {
                 file={beforeProofFile}
                 onChange={setBeforeProofFile}
               />
-              <button className="k-btn" type="submit">
-                Upload before-work proof
+              <button className="k-btn flex items-center gap-2" type="submit" disabled={uploadingBeforeProof}>
+                {uploadingBeforeProof ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    <span>Uploading before-work proof...</span>
+                  </>
+                ) : (
+                  "Upload before-work proof"
+                )}
               </button>
             </form>
           ) : null}
@@ -712,20 +729,31 @@ export default function JobDetailPage() {
                         <p>{application.status}</p>
                         {(isCustomer || isAdmin) ? (
                           <button
-                            className="k-btn w-full"
+                            className="k-btn w-full flex items-center justify-center gap-2"
                             disabled={
                               !["broadcasting", "worker_selected"].includes(job.status) ||
                               isAssignedWorker ||
-                              !applicationWorkerId
+                              !applicationWorkerId ||
+                              actionLoading === applicationWorkerId
                             }
                             onClick={() =>
                               withRefresh(
+                                applicationWorkerId,
                                 () => selectWorkerRequest(jobId, applicationWorkerId),
                                 "Worker assigned",
                               )
                             }
                           >
-                            {isAssignedWorker ? "Assigned worker" : "Assign worker"}
+                            {actionLoading === applicationWorkerId ? (
+                              <>
+                                <span className="loading loading-spinner loading-xs" />
+                                <span>Assigning...</span>
+                              </>
+                            ) : isAssignedWorker ? (
+                              "Assigned worker"
+                            ) : (
+                              "Assign worker"
+                            )}
                           </button>
                         ) : null}
                       </div>
@@ -849,7 +877,7 @@ export default function JobDetailPage() {
               className="mt-5 space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                withRefresh(() => cancelJobRequest(jobId, cancelReason), "Job cancelled");
+                withRefresh("cancel", () => cancelJobRequest(jobId, cancelReason), "Job cancelled");
               }}
             >
               <TextAreaField
@@ -857,8 +885,9 @@ export default function JobDetailPage() {
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
               />
-              <button className="k-btn-ghost" type="submit">
-                Cancel job
+              <button className="k-btn-ghost flex items-center gap-2" type="submit" disabled={actionLoading === "cancel"}>
+                {actionLoading === "cancel" && <span className="loading loading-spinner loading-xs" />}
+                <span>{actionLoading === "cancel" ? "Cancelling..." : "Cancel job"}</span>
               </button>
             </form>
           </SectionPanel>
@@ -875,15 +904,18 @@ export default function JobDetailPage() {
               completion flow.
             </p>
             <button
-              className="k-btn mt-6"
+              className="k-btn mt-6 flex items-center gap-2"
+              disabled={actionLoading === "arrived"}
               onClick={() =>
                 withRefresh(
+                  "arrived",
                   () => markWorkerArrivedRequest(jobId),
                   "Arrival marked",
                 )
               }
             >
-              Mark arrived
+              {actionLoading === "arrived" && <span className="loading loading-spinner loading-xs" />}
+              <span>{actionLoading === "arrived" ? "Marking arrival..." : "Mark arrived"}</span>
             </button>
           </SectionPanel>
         ) : null}
@@ -897,7 +929,7 @@ export default function JobDetailPage() {
               className="mt-5 space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                withRefresh(async () => {
+                withRefresh("complete", async () => {
                   await markWorkCompletedRequest(jobId, completeForm);
 
                   if (afterProofFile) {
@@ -933,8 +965,9 @@ export default function JobDetailPage() {
                 file={afterProofFile}
                 onChange={setAfterProofFile}
               />
-              <button className="k-btn" type="submit">
-                Swipe work completed
+              <button className="k-btn flex items-center gap-2" type="submit" disabled={actionLoading === "complete"}>
+                {actionLoading === "complete" && <span className="loading loading-spinner loading-xs" />}
+                <span>{actionLoading === "complete" ? "Completing job..." : "Swipe work completed"}</span>
               </button>
             </form>
           </SectionPanel>
@@ -956,6 +989,7 @@ export default function JobDetailPage() {
               onSubmit={(e) => {
                 e.preventDefault();
                 withRefresh(
+                  "confirm",
                   () => confirmJobCompletionRequest(jobId, confirmForm),
                   "Job confirmed",
                 );
@@ -995,8 +1029,9 @@ export default function JobDetailPage() {
                   setConfirmForm((prev) => ({ ...prev, review: e.target.value }))
                 }
               />
-              <button className="k-btn" type="submit">
-                Confirm job done
+              <button className="k-btn flex items-center gap-2" type="submit" disabled={actionLoading === "confirm"}>
+                {actionLoading === "confirm" && <span className="loading loading-spinner loading-xs" />}
+                <span>{actionLoading === "confirm" ? "Confirming..." : "Confirm job done"}</span>
               </button>
             </form>
           </SectionPanel>
@@ -1014,6 +1049,7 @@ export default function JobDetailPage() {
               onSubmit={(e) => {
                 e.preventDefault();
                 withRefresh(
+                  "dispute",
                   () => raiseDisputeRequest(jobId, { issue }),
                   "Dispute raised",
                 );
@@ -1024,8 +1060,9 @@ export default function JobDetailPage() {
                 value={issue}
                 onChange={(e) => setIssue(e.target.value)}
               />
-              <button className="k-btn-ghost" type="submit">
-                Raise dispute
+              <button className="k-btn-ghost flex items-center gap-2" type="submit" disabled={actionLoading === "dispute"}>
+                {actionLoading === "dispute" && <span className="loading loading-spinner loading-xs" />}
+                <span>{actionLoading === "dispute" ? "Raising dispute..." : "Raise dispute"}</span>
               </button>
             </form>
 
@@ -1035,6 +1072,7 @@ export default function JobDetailPage() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   withRefresh(
+                    "warranty",
                     () => claimWarrantyRequest(jobId, { notes: warrantyNotes }),
                     "Warranty claimed",
                   );
@@ -1045,8 +1083,9 @@ export default function JobDetailPage() {
                   value={warrantyNotes}
                   onChange={(e) => setWarrantyNotes(e.target.value)}
                 />
-                <button className="k-btn" type="submit">
-                  Claim 7-day warranty
+                <button className="k-btn flex items-center gap-2" type="submit" disabled={actionLoading === "warranty"}>
+                  {actionLoading === "warranty" && <span className="loading loading-spinner loading-xs" />}
+                  <span>{actionLoading === "warranty" ? "Submitting claim..." : "Claim 7-day warranty"}</span>
                 </button>
               </form>
             ) : null}

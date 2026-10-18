@@ -14,11 +14,13 @@ import SectionPanel from "../../views/components/SectionPanel.jsx";
 import { InputField, SelectField } from "../../views/components/FormField.jsx";
 import { formatCurrency, formatDateTime } from "../../models/format.model.js";
 import EmptyState from "../../views/components/EmptyState.jsx";
+import LoaderState from "../../views/components/LoaderState.jsx";
 
 export default function WalletPage() {
   const { refreshSession } = useAppController();
   const [summary, setSummary] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ amount: "", upiReference: "", upiApp: "PhonePe", paymentMethod: "default" });
   const [checkoutModal, setCheckoutModal] = useState(null); // null, 'stripe', 'razorpay'
   const [processingPayment, setProcessingPayment] = useState(false);
@@ -35,6 +37,8 @@ export default function WalletPage() {
       setTransactions(transactionsResponse.data.transactions || []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not load wallet data");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,6 +91,10 @@ export default function WalletPage() {
       setProcessingPayment(false);
     }
   };
+
+  if (loading) {
+    return <LoaderState label="Loading wallet balances & transactions..." />;
+  }
 
   return (
     <MotionPage className="space-y-8">
@@ -170,8 +178,17 @@ export default function WalletPage() {
               </>
             )}
 
-            <button className="k-btn w-full font-semibold" type="submit" disabled={processingPayment}>
-              {processingPayment ? "Connecting..." : form.paymentMethod === "default" ? "Recharge now" : `Pay with ${form.paymentMethod === "stripe" ? "Stripe" : "Razorpay"}`}
+            <button className="k-btn w-full font-semibold flex items-center justify-center gap-2" type="submit" disabled={processingPayment}>
+              {processingPayment ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  <span>Connecting to gateway...</span>
+                </>
+              ) : form.paymentMethod === "default" ? (
+                "Recharge now"
+              ) : (
+                `Pay with ${form.paymentMethod === "stripe" ? "Stripe" : "Razorpay"}`
+              )}
             </button>
           </form>
         </SectionPanel>

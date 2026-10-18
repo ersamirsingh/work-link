@@ -3,6 +3,8 @@ import User from "../../models/user.model.js";
 import { model } from "./gemini.config.js";
 import { matchmakerApp } from "./matchmaker.graph.js";
 
+import { STANDARD_RATE_CARD } from "../../utils/platform.utils.js";
+
 /**
  * AI Diagnose & Autofill
  * Takes a problem description and returns structured parameters for creating a job.
@@ -14,6 +16,10 @@ export const diagnoseJob = async (req, res) => {
       return res.status(400).json({ success: false, message: "Description is required" });
     }
 
+    const availableServicesText = (STANDARD_RATE_CARD || [])
+      .map((item) => `         - "${item.serviceCode}" (${item.category} - ${item.title})`)
+      .join("\n");
+
     const prompt = `
       Analyze this household problem description: "${description}"
       
@@ -23,13 +29,7 @@ export const diagnoseJob = async (req, res) => {
       3. "skills": An array of 2-4 key skills needed to resolve the issue (e.g. ["wiring", "soldering", "ac-maintenance"]).
       4. "pricingModel": Select either "standard" if it matches one of our standard services, or "inspection" if it's a diagnostic/complex job.
       5. "serviceCode": If pricingModel is "standard", select the code that matches best. Select empty string "" if it's "inspection" or doesn't match:
-         - "fan-installation" (Electrical)
-         - "switchboard-repair" (Electrical)
-         - "tap-replacement" (Plumbing)
-         - "pipe-leak-fix" (Plumbing)
-         - "ac-service-basic" (Appliance)
-         - "deep-cleaning-room" (Cleaning)
-         - "door-lock-repair" (Carpentry)
+${availableServicesText || '         - "fan-installation" (Electrical)\n         - "tap-replacement" (Plumbing)'}
       6. "safetyInstructions": A short 1-sentence tip or safety precaution for the customer while they wait for help.
 
       Return ONLY the JSON string. Do not include markdown code block backticks (like \`\`\`json).

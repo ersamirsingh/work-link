@@ -5,11 +5,13 @@ import app from "./src/app.js";
 import { connectToDB } from "./src/config/db.config.js";
 import redisClient from "./src/config/redis.config.js";
 import { processPendingJobsLifecycle } from "./src/utils/job.utils.js";
+import { initPlatformConfig } from "./src/utils/platform.utils.js";
 
 const PORT = process.env.PORT || 3000;
 
 const bootstrap = async () => {
     await Promise.allSettled([connectToDB(), redisClient.connect()]);
+    await initPlatformConfig();
 
     await processPendingJobsLifecycle();
     setInterval(() => {

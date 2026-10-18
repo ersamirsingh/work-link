@@ -11,7 +11,8 @@ import MotionPage from "../../views/components/MotionPage.jsx";
 import PageHeader from "../../views/components/PageHeader.jsx";
 import SectionPanel from "../../views/components/SectionPanel.jsx";
 import DetailGrid from "../../views/components/DetailGrid.jsx";
-import { InputField } from "../../views/components/FormField.jsx";
+import LoaderState from "../../views/components/LoaderState.jsx";
+import EmptyState from "../../views/components/EmptyState.jsx";
 
 export default function AdminDisputeDetailPage() {
   const { disputeId } = useParams();
@@ -20,6 +21,9 @@ export default function AdminDisputeDetailPage() {
   const [resolutionNotes, setResolutionNotes] = useState("");
   const [selectedMediator, setSelectedMediator] = useState("");
   const [action, setAction] = useState("refund");
+  const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+  const [resolving, setResolving] = useState(false);
 
   const load = async () => {
     try {
@@ -31,6 +35,8 @@ export default function AdminDisputeDetailPage() {
       setMediators(mediatorsResponse.data.mediators || []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not load dispute detail");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -38,8 +44,19 @@ export default function AdminDisputeDetailPage() {
     load();
   }, [disputeId]);
 
+  if (loading) {
+    return <LoaderState label="Loading dispute details..." />;
+  }
+
   if (!dispute) {
-    return null;
+    return (
+      <MotionPage className="space-y-8">
+        <PageHeader eyebrow="Dispute detail" title="Dispute not found" description="The requested dispute record was not found." />
+        <SectionPanel>
+          <EmptyState title="Dispute not found" description="This dispute could not be loaded or was removed." />
+        </SectionPanel>
+      </MotionPage>
+    );
   }
 
   return (
@@ -79,17 +96,28 @@ export default function AdminDisputeDetailPage() {
               </select>
               <button
                 className="k-btn mt-4"
+                disabled={assigning || !selectedMediator}
                 onClick={async () => {
+                  setAssigning(true);
                   try {
                     await assignMediatorRequest(disputeId, selectedMediator);
                     toast.success("Mediator assigned");
                     await load();
                   } catch (error) {
                     toast.error(error.response?.data?.message || "Assignment failed");
+                  } finally {
+                    setAssigning(false);
                   }
                 }}
               >
-                Assign mediator
+                {assigning ? (
+                  <span className="flex items-center gap-2">
+                    <span className="loading loading-spinner loading-xs" />
+                    Assigning mediator...
+                  </span>
+                ) : (
+                  "Assign mediator"
+                )}
               </button>
             </div>
             <div className="surface-divider pt-5">
@@ -112,17 +140,28 @@ export default function AdminDisputeDetailPage() {
               />
               <button
                 className="k-btn mt-4"
+                disabled={resolving}
                 onClick={async () => {
+                  setResolving(true);
                   try {
                     await resolveDisputeRequest(disputeId, { action, notes: resolutionNotes });
                     toast.success("Dispute resolved");
                     await load();
                   } catch (error) {
                     toast.error(error.response?.data?.message || "Resolution failed");
+                  } finally {
+                    setResolving(false);
                   }
                 }}
               >
-                Resolve dispute
+                {resolving ? (
+                  <span className="flex items-center gap-2">
+                    <span className="loading loading-spinner loading-xs" />
+                    Resolving dispute...
+                  </span>
+                ) : (
+                  "Resolve dispute"
+                )}
               </button>
             </div>
           </div>

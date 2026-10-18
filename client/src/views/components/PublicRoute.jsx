@@ -1,14 +1,17 @@
 import { Navigate } from "react-router-dom";
-import { useAppController } from "../../controllers/AppController";
+import { useAppController } from "../../controllers/AppController.jsx";
+import LoaderState from "./LoaderState.jsx";
 
 export default function PublicRoute({ children }) {
-   const { user, isLoading } = useAppController();
+   const { user, loading } = useAppController();
 
-   if (isLoading) return null; // or loader
+   if (loading) {
+      return <LoaderState label="Checking authentication..." />;
+   }
 
    if (user) {
       // Role-based redirect
-      if (user.role === "admin") {
+      if (user.role === "admin" || user.role === "system_admin") {
          return <Navigate to="/app/admin/overview" replace />;
       }
 

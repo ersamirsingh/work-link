@@ -8,6 +8,7 @@ import MetricCard from "../../views/components/MetricCard.jsx";
 import SectionPanel from "../../views/components/SectionPanel.jsx";
 import EmptyState from "../../views/components/EmptyState.jsx";
 import JobCard from "../../views/components/JobCard.jsx";
+import LoaderState from "../../views/components/LoaderState.jsx";
 import { formatCurrency } from "../../models/format.model.js";
 
 export default function CustomerDashboardPage() {
@@ -57,6 +58,10 @@ export default function CustomerDashboardPage() {
         jobCategory: job.category,
       }))
     );
+
+  if (loading) {
+    return <LoaderState label="Loading employer desk..." />;
+  }
 
   return (
     <MotionPage className="space-y-8">

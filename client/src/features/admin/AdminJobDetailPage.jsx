@@ -8,9 +8,13 @@ import SectionPanel from "../../views/components/SectionPanel.jsx";
 import DetailGrid from "../../views/components/DetailGrid.jsx";
 import { formatCurrency, formatDateTime } from "../../models/format.model.js";
 
+import EmptyState from "../../views/components/EmptyState.jsx";
+import LoaderState from "../../views/components/LoaderState.jsx";
+
 export default function AdminJobDetailPage() {
   const { jobId } = useParams();
   const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -19,14 +23,27 @@ export default function AdminJobDetailPage() {
         setJob(response.data.job);
       } catch (error) {
         toast.error(error.response?.data?.message || "Could not load job");
+      } finally {
+        setLoading(false);
       }
     };
 
     load();
   }, [jobId]);
 
+  if (loading) {
+    return <LoaderState label="Loading job record..." />;
+  }
+
   if (!job) {
-    return null;
+    return (
+      <MotionPage className="space-y-8">
+        <PageHeader eyebrow="Job detail" title="Job not found" description="The requested job record was not found." />
+        <SectionPanel>
+          <EmptyState title="Job not found" description="This job record could not be loaded or was removed." />
+        </SectionPanel>
+      </MotionPage>
+    );
   }
 
   return (
