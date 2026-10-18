@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { MapPin, RadioTower, Sparkles, UserRound, Wallet } from "lucide-react";
 import StatusBadge from "./StatusBadge.jsx";
 import { formatCurrency, formatDateTime } from "../../models/format.model.js";
+import { useAppController } from "../../controllers/AppController.jsx";
 
 const PROGRESS_LABELS = {
   broadcasting: "Waiting for worker interest",
-  worker_selected: "Assigned and on the way",
+  worker_selected: "Assigned and en route",
   in_progress: "Repair in progress",
-  completed_pending_confirmation: "Awaiting your confirmation",
+  completed_pending_confirmation: "Awaiting customer confirmation",
   completed: "Closed successfully",
   cancelled: "Cancelled",
   disputed: "Dispute open",
@@ -16,6 +17,9 @@ const PROGRESS_LABELS = {
 };
 
 export default function JobCard({ job, href, action, showAssignment = false }) {
+  const { user } = useAppController();
+  const isCustomer = user?.activeMode === "customer";
+
   const amount =
     job?.pricing?.standardRate ||
     job?.pricing?.inspectionFee ||
@@ -23,11 +27,32 @@ export default function JobCard({ job, href, action, showAssignment = false }) {
     job?.wage ||
     0;
   const assignedWorkerName = job?.selectedWorker?.Name || "";
-  const lifecycleBadges = [
-    job?.timeline?.workerArrivedAt ? "Arrived" : null,
-    job?.timeline?.workCompletedAt ? "Completed" : null,
-    job?.timeline?.closedAt ? "Closed" : null,
-  ].filter(Boolean);
+
+  // Resolve the single latest milestone reached instead of displaying past milestones simultaneously
+  const getLatestMilestone = (j) => {
+    if (j?.timeline?.closedAt || j?.status === "completed") {
+      return { label: "Job Closed", time: j?.timeline?.closedAt };
+    }
+    if (j?.timeline?.workCompletedAt || j?.status === "completed_pending_confirmation") {
+      return { label: "Work Completed", time: j?.timeline?.workCompletedAt };
+    }
+    if (j?.timeline?.workerArrivedAt || j?.status === "in_progress") {
+      return { label: "Worker Arrived", time: j?.timeline?.workerArrivedAt };
+    }
+    if (j?.selectedWorker) {
+      return { label: "Worker Assigned", time: j?.timeline?.selectedAt };
+    }
+    return null;
+  };
+
+  const latestMilestone = getLatestMilestone(job);
+
+  const progressText =
+    job?.status === "completed_pending_confirmation"
+      ? isCustomer
+        ? "Awaiting your confirmation"
+        : "Awaiting customer confirmation"
+      : PROGRESS_LABELS[job?.status] || "Status unavailable";
 
   return (
     <motion.article
@@ -79,27 +104,32 @@ export default function JobCard({ job, href, action, showAssignment = false }) {
                 <div className="flex items-center gap-2 text-sm">
                   <UserRound className="h-4 w-4 text-warning" />
                   <span className="text-base-content/55">Assigned to:</span>
-                  <span className="text-base-100">
+                  <span className="text-base-100 font-medium">
                     {assignedWorkerName || "No worker assigned yet"}
                   </span>
                 </div>
                 <div className="text-sm">
                   <span className="text-base-content/55">Progress:</span>{" "}
-                  <span className="text-base-100">
-                    {PROGRESS_LABELS[job?.status] || "Status unavailable"}
+                  <span className="text-base-100 font-medium">
+                    {progressText}
                   </span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {lifecycleBadges.length ? (
-                  lifecycleBadges.map((badge) => (
-                    <span key={badge} className="status-chip">
-                      {badge}
-                    </span>
-                  ))
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-base-content/50 font-medium">Latest Milestone:</span>
+                {latestMilestone ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-semibold bg-warning/10 text-warning border border-warning/25">
+                    <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+                    <span>{latestMilestone.label}</span>
+                    {latestMilestone.time ? (
+                      <span className="text-base-content/40 font-normal">
+                        ({formatDateTime(latestMilestone.time)})
+                      </span>
+                    ) : null}
+                  </span>
                 ) : (
-                  <span className="text-sm text-base-content/50">
+                  <span className="text-base-content/40">
                     No lifecycle milestone reached yet
                   </span>
                 )}
@@ -121,7 +151,10 @@ export default function JobCard({ job, href, action, showAssignment = false }) {
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {(job.skills || []).slice(0, 3).map((skill) => (
-              <span key={skill} className="status-chip">
+              <span
+                key={skill}
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-base-content/75 border border-white/5"
+              >
                 {skill}
               </span>
             ))}

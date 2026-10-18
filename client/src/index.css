@@ -200,7 +200,7 @@ textarea {
 }
 
 .status-chip {
-  @apply badge rounded-full border-0 px-3 py-3;
+  @apply badge rounded-full border-0 px-3 py-1.5 text-xs;
   background: rgba(255, 255, 255, 0.06);
   color: var(--ink-soft);
 }
