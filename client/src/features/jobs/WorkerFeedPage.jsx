@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 import { getWorkerFeedRequest, expressInterestRequest } from "../../models/worker.model.js";
-import { getMyJobsRequest } from "../../models/job.model.js";
 import MotionPage from "../../views/components/MotionPage.jsx";
 import PageHeader from "../../views/components/PageHeader.jsx";
 import SectionPanel from "../../views/components/SectionPanel.jsx";
@@ -12,18 +11,8 @@ import LoaderState from "../../views/components/LoaderState.jsx";
 import { useAppController } from "../../controllers/AppController.jsx";
 import { TextAreaField, InputField } from "../../views/components/FormField.jsx";
 import VoiceComposerField from "../../views/components/VoiceComposerField.jsx";
-import { formatCurrency } from "../../models/format.model.js";
 import BrowserLocationField from "../../views/components/BrowserLocationField.jsx";
 import { MapPin } from "lucide-react";
-
-const ACTIVE_WORKER_STATUSES = [
-  "worker_selected",
-  "in_progress",
-  "completed_pending_confirmation",
-  "completed",
-  "warranty_claimed",
-  "disputed",
-];
 
 const DOMAINS = ["All", "Electrical", "Plumbing", "Appliance", "Cleaning", "Carpentry", "Painting", "General", "Other"];
 
@@ -31,7 +20,6 @@ export default function WorkerFeedPage() {
   const { user, updateLocation } = useAppController();
   const [drafts, setDrafts] = useState({});
   const [jobs, setJobs] = useState([]);
-  const [myJobs, setMyJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncingLocation, setSyncingLocation] = useState(false);
   const [selectedRadius, setSelectedRadius] = useState(
@@ -70,25 +58,8 @@ export default function WorkerFeedPage() {
     }
     setLoading(true);
     try {
-      const [feedResponse, myJobsResponse] = await Promise.all([
-        getWorkerFeedRequest(radius),
-        getMyJobsRequest(),
-      ]);
-      setJobs(feedResponse.data.jobs || []);
-
-      const workerJobs = (myJobsResponse.data.jobs || []).filter((job) => {
-        const selectedWorkerId = String(job.selectedWorker?._id || job.selectedWorker || "");
-        const isSelectedWorker = selectedWorkerId === String(user?._id || "");
-        const hasApplied = (job.applications || []).some(
-          (application) =>
-            String(application.worker?._id || application.worker || "") ===
-            String(user?._id || ""),
-        );
-
-        return isSelectedWorker || hasApplied;
-      });
-
-      setMyJobs(workerJobs);
+      const feedResponse = await getWorkerFeedRequest(radius);
+      setJobs(feedResponse.data?.jobs || feedResponse.jobs || []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not load worker feed");
     } finally {
@@ -129,21 +100,6 @@ export default function WorkerFeedPage() {
       toast.error(error.response?.data?.message || "Could not send interest");
     }
   };
-
-  const activeWorkerJobs = myJobs.filter((job) =>
-    ACTIVE_WORKER_STATUSES.includes(job.status),
-  );
-  const appliedJobs = myJobs.filter((job) => {
-    const selectedWorkerId = String(job.selectedWorker?._id || job.selectedWorker || "");
-    const isSelectedWorker = selectedWorkerId === String(user?._id || "");
-    const hasApplied = (job.applications || []).some(
-      (application) =>
-        String(application.worker?._id || application.worker || "") ===
-        String(user?._id || ""),
-    );
-
-    return hasApplied && !isSelectedWorker && !ACTIVE_WORKER_STATUSES.includes(job.status);
-  });
 
 
   return (
@@ -245,64 +201,6 @@ export default function WorkerFeedPage() {
           </div>
         </div>
       </SectionPanel>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <SectionPanel>
-          <p className="section-label">My worker jobs</p>
-          <h2 className="mt-2 text-2xl text-base-100">Assigned and active work</h2>
-          <p className="mt-3 text-sm leading-7 text-base-content/60">
-            Keep track of jobs assigned to you, jobs in progress, and jobs waiting for customer confirmation.
-          </p>
-
-          <div className="mt-6 grid gap-4">
-            {activeWorkerJobs.length ? (
-              activeWorkerJobs.map((job) => (
-                <div key={job._id} className="rounded-[1.5rem] border border-white/6 bg-white/3 p-4">
-                  <JobCard
-                    href={`/app/worker/jobs/${job._id}`}
-                    job={job}
-                    showAssignment
-                  />
-                  <div className="mt-4 rounded-[1.2rem] border border-white/6 bg-black/10 px-4 py-3 text-sm leading-6 text-base-content/60">
-                    <p>
-                      Current stage: <span className="text-base-100">{job.status.replaceAll("_", " ")}</span>
-                    </p>
-                    <p>
-                      Customer payable: <span className="text-base-100">{formatCurrency(job.pricing?.totalUserPayable || job.wage || 0)}</span>
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <EmptyState
-                title="No active worker jobs"
-                copy="Once you are selected for a job or mark arrival/completion, those jobs will stay visible here for tracking."
-              />
-            )}
-          </div>
-        </SectionPanel>
-
-        <SectionPanel>
-          <p className="section-label">Applied jobs</p>
-          <h2 className="mt-2 text-2xl text-base-100">Quotes you already sent</h2>
-          <p className="mt-3 text-sm leading-7 text-base-content/60">
-            These are jobs where you already expressed interest, so they do not disappear after you apply.
-          </p>
-
-          <div className="mt-6 grid gap-4">
-            {appliedJobs.length ? (
-              appliedJobs.map((job) => (
-                <JobCard key={job._id} href={`/app/worker/jobs/${job._id}`} job={job} />
-              ))
-            ) : (
-              <EmptyState
-                title="No pending applications"
-                copy="After you send interest on a job, it will stay visible here until the customer assigns someone."
-              />
-            )}
-          </div>
-        </SectionPanel>
-      </div>
 
       {/* Distance filter */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-[1.75rem] border border-white/6 bg-white/3 p-6">

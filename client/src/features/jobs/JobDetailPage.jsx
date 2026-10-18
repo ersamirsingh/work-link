@@ -447,10 +447,10 @@ export default function JobDetailPage() {
                     Rating: {Number(job.selectedWorker.rating || 0).toFixed(1)} (
                     {job.selectedWorker.ratingCount || 0} reviews)
                   </p>
-                  <p>
-                    Status:{" "}
-                    <span className="text-base-100">{job.status.replaceAll("_", " ")}</span>
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <span>Status:</span>
+                    <StatusBadge value={job.status} />
+                  </div>
                 </div>
               ) : (
                 <p className="mt-5 text-sm leading-7 text-base-content/60">

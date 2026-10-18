@@ -10,8 +10,8 @@ import { useAppController } from "../../controllers/AppController.jsx";
 
 const TABS = [
   { id: "all", label: "All Jobs", description: "All jobs you have ever applied to or worked on." },
-  { id: "active", label: "Ongoing Work", description: "Jobs you are currently working on or waiting for customer confirmation." },
-  { id: "completed", label: "Completed", description: "Jobs you successfully resolved and completed." },
+  { id: "active", label: "Ongoing Work", description: "Jobs you are currently assigned to and actively working on." },
+  { id: "completed", label: "Completed", description: "Jobs you completed or that are awaiting customer confirmation." },
   { id: "cancelled", label: "Cancelled", description: "Jobs that were cancelled or abandoned." },
   { id: "applied", label: "Applied & Offers", description: "Jobs where you expressed interest and are awaiting selection." },
 ];
@@ -53,11 +53,11 @@ export default function WorkerJobsPage() {
       }
 
       if (activeTab === "active") {
-        return isAssigned && ["worker_selected", "in_progress", "completed_pending_confirmation"].includes(job.status);
+        return isAssigned && ["worker_selected", "in_progress"].includes(job.status);
       }
       
       if (activeTab === "completed") {
-        return isAssigned && ["completed", "warranty_claimed", "disputed"].includes(job.status);
+        return isAssigned && ["completed_pending_confirmation", "completed", "warranty_claimed", "disputed"].includes(job.status);
       }
       
       if (activeTab === "cancelled") {
